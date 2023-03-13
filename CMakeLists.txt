@@ -31,7 +31,8 @@ add_subdirectory(external/pybind11)
 
 add_library(controller_library SHARED
         src/controller.cpp
-        src/diff_drive.cpp src/geometry.cpp)
+        src/diff_drive.cpp
+        src/geometry.cpp)
 
 
 target_include_directories(controller_library
@@ -49,9 +50,9 @@ target_link_libraries(controller_library xtensor-blas)
 target_link_libraries(controller_library xsimd)
 
 
-pybind11_add_module(mppi_ca python_bind/python_controller.hpp python_bind/python_controller.cpp python_bind/mppi_ca.cpp NO_EXTRAS)
-target_link_libraries(mppi_ca PRIVATE xtensor-python Python::NumPy)
-target_link_libraries(mppi_ca PRIVATE controller_library)
+pybind11_add_module(mppi_ca_cpp python_bind/converters.hpp python_bind/converters.cpp python_bind/mppi_ca_cpp.cpp NO_EXTRAS)
+target_link_libraries(mppi_ca_cpp PRIVATE xtensor-python Python::NumPy)
+target_link_libraries(mppi_ca_cpp PRIVATE controller_library)
 
 add_executable(mppi_test src/main.cpp)
 target_link_libraries(mppi_test PRIVATE controller_library)
@@ -61,5 +62,5 @@ add_custom_target(mppi_all)
 add_dependencies(mppi_all
         controller_library
         mppi_test
-        mppi_ca
+        mppi_ca_cpp
         )

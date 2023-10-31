@@ -11,10 +11,16 @@
 #include <iostream>
 #include <ctime>
 #include <limits>
+#include <cmath>
+#include <memory>
+#include <random>
+
+#include "ortools/linear_solver/linear_solver.h"
 
 #include "consts.hpp"
-#include "diff_drive.hpp"
+#include "dynamics.hpp"
 #include "geometry.hpp"
+#include "orca_lines.hpp"
 
 namespace mppica {
 	using std::cout;
@@ -38,16 +44,9 @@ namespace mppica {
 		double ma_dist_weight = 1000.0;
 		double ma_collision_value = 10000.0;
 		double ma_dist_threshold = 2.0;
-
-		size_t max_safe_distr_step; // TODO
-		size_t max_bvc_cost_step; // TODO
-		double bvc_weight; // TODO
-		double bvc_w_base; // TODO
-		double bvc_w_mean; // TODO
-		double bvc_w_std; // TODO
-
-		bool importance_sampl_en; // TODO importance sampling
-		double alpha; // TODO sampling from zero alpha % of batches
+		int max_safe_distr_step = 0;
+		bool car_like_dyn = false;
+        double alpha; // TODO: Sampling with initial mean value in alpha% of batches
 	};
 
 	struct AgentParams {
@@ -60,15 +59,13 @@ namespace mppica {
 		double dd_w_min = -2.0;
 	};
 
-//	xt::xtensor<double, 2> control_limits;
-
 
 	class Controller {
 		public:
 			Controller();
 
 			auto nextStep(const xt::xtensor<double, 1> &curr_state, const xt::xtensor<double, 2> &neighbors_states,
-						  const xt::xtensor<double, 1> &goal_state) -> xt::xtensor<double, 1>;
+						  const xt::xtensor<double, 1> &goal_state) -> std::tuple<xt::xtensor<double, 1>, xt::xtensor<double, 3>>;
 
 			void setAgentParams(AgentParams ag_params);
 
@@ -118,11 +115,23 @@ namespace mppica {
 
 			void multiAgentCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state);
 
+			void computeLinearConstraintsForState(const xt::xtensor<double, 1> &state,
+												  const xt::xtensor<double, 2> &neighbors_states);
+
+			void resampleInitialWithConstraints();
+
+
+			std::tuple<bool, double, double> computeNewDistr(const xt::xtensor<double, 1> &state, const xt::xtensor<double, 1> &control);
+
+			std::tuple<xt::xtensor<double, 1>, xt::xtensor<double, 1>> translateConstraintsToControlBounds(const xt::xtensor<double, 1> &state);
 
 			bool computationShouldStop(); // TODO
 			void updateStopComputationConditions(); // TODO
 			void computeMainTrajectory(); // TODO
 
+
+			size_t step; // For debug purpuses
+			size_t controller_id; // For debug purpuses
 
 			bool ma_cost_en;
 			size_t max_neighbors_num;
@@ -130,6 +139,7 @@ namespace mppica {
 			double ma_dist_weight;
 			double ma_collision_value;
 			double ma_dist_threshold;
+			int max_safe_distr_step;
 
 			size_t batch_size;
 			size_t time_steps;
@@ -148,17 +158,26 @@ namespace mppica {
 			xt::xtensor<double, 2> control_sequence;
 			xt::xtensor<double, 3> generated_trajectories;
 			xt::xtensor<double, 1> traj_costs;
-
 			xt::xtensor<double, 3> neighbors_traj;
+			xt::xtensor<double, 2> linear_constraints;
+			std::vector<ORCALine> orca_lines;
+			bool orca_complete = true;
+
+
 
 			double common_run_cost_weight;
 			double common_terminal_cost_weight;
 
 			double agent_size;
 			double vis_radius;
+			double rad_eps;
 
+			bool use_car_like_dyn;
 
 			DiffDrive dyn_model; //TODO Generalize for other models
+			CarLike car_like_dyn;
+
+
 	};
 
 }

@@ -2,6 +2,7 @@
 #define FORCE_IMPORT_ARRAY
 #include <xtensor-python/pytensor.hpp>
 #include "../include/controller.hpp"
+#include "../include/orca_lines.hpp"
 #include "converters.hpp"
 
 namespace py = pybind11;
@@ -20,14 +21,6 @@ PYBIND11_MODULE(mppi_ca_cpp, m) {
 
 	m.def("convert_agent_params", &convertAgentParams, "Coverts agent params");
 	m.def("convert_alg_params", &convertAlgParams, "Coverts alg parameters");
+	m.def("compute_orca_lines", &computeORCALinesXT, "Computes ORCA lines for agents");
 }
-
-
-//PYBIND11_MODULE(bind_module, m) {
-//	xt::import_numpy();
-//	py::class_<Controller>(m, "Controller")
-//			.def(py::init<>())
-//			.def("next_step", &Controller::nextStep);
-//}
-
 

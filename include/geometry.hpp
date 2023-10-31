@@ -10,9 +10,14 @@
 #ifndef MPPI_CA_CPP_GEOMETRY_HPP
 #define MPPI_CA_CPP_GEOMETRY_HPP
 
-double point_to_line_segment_distance(const xt::xtensor<double, 1> &line_p1,
-									  const xt::xtensor<double, 1> &line_p2,
-									  const xt::xtensor<double, 1> &point);
+double pointToLineSegmentDistance(const xt::xtensor<double, 1> &line_p1,
+								  const xt::xtensor<double, 1> &line_p2,
+								  const xt::xtensor<double, 1> &point);
+
+double determinant2D(const xt::xtensor<double, 1> &ab, const xt::xtensor<double, 1> &cd);
+
+
+std::tuple<bool, xt::xtensor<double, 1>> lineIntersection(const xt::xtensor<double, 1> &line1, const xt::xtensor<double, 1> &line2);
 
 
 #endif //MPPI_CA_CPP_GEOMETRY_HPP

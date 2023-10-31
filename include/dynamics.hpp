@@ -13,13 +13,25 @@
 #define MPPI_CA_CPP_DIFF_DRIVE_HPP
 
 
-class DiffDrive
-{
+class DiffDrive {
 	public:
 		auto shift(const xt::xtensor<double, 1> &state, double dt) -> xt::xtensor<double, 1>;
-		auto dynamic(const xt::xtensor<double, 1> &state, const xt::xtensor<double, 1> &control, double dt) -> xt::xtensor<double, 1>;
+
+		auto dynamic(const xt::xtensor<double, 1> &state, const xt::xtensor<double, 1> &control,
+					 double dt) -> xt::xtensor<double, 1>;
 
 
+};
+
+
+class CarLike {
+	public:
+		auto shift(const xt::xtensor<double, 1> &state, double dt) -> xt::xtensor<double, 1>;
+
+		auto dynamic(const xt::xtensor<double, 1> &state, const xt::xtensor<double, 1> &control,
+					 double dt) -> xt::xtensor<double, 1>;
+
+		double dist_between_axles;
 };
 
 

@@ -35,6 +35,8 @@ mppica::MPPIParams convertAlgParams(const py::dict &params_dict) {
 	params.ma_dist_weight = params_dict["ma_dist_weight"].cast<double>();
 	params.ma_collision_value = params_dict["ma_collision_weight"].cast<double>();
 	params.ma_dist_threshold = params_dict["ma_dist_threashhold"].cast<double>();
+	params.max_safe_distr_step = params_dict["max_safe_distr_step"].cast<int>();
+	params.car_like_dyn = params_dict["car_like_dyn"].cast<bool>();
 
 	return params;
 }

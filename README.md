@@ -86,7 +86,7 @@ cd ../../example
 jupyter notebook
 ```
 
-The notebook contains a circular scenario (see figure below), the size of the circle and the number of agents can be changed by updating variables `CIRC_R` and `AGENTS_NUM`.
+The notebook contains a circular scenario (see animation at the top), the size of the circle and the number of agents can be changed by updating variables `CIRC_R` and `AGENTS_NUM`.
 
 ```python
 CIRC_R = 6 # size of the circle

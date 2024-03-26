@@ -35,18 +35,31 @@ namespace mppica {
 		xt::xtensor<double, 1> initial_values = xt::zeros<double>({2});
 		xt::xtensor<double, 1> mean = xt::zeros<double>({2});;
 		xt::xtensor<double, 2> cov = xt::eye<double>(2);
-
-		double common_run_cost_weight = 1.0;
-		double common_terminal_cost_weight = 1.0;
+		double run_cost_weight = 1.0;
+		double terminal_cost_weight = 1.0;
 		double lambda = 0.1;
 		bool ma_cost_en = true;
-		size_t max_neighbors_num = 10;
+
 		double ma_dist_weight = 1000.0;
 		double ma_collision_value = 10000.0;
 		double ma_dist_threshold = 2.0;
-		int max_safe_distr_step = 0;
+
 		bool car_like_dyn = false;
-        double alpha; // TODO: Sampling with initial mean value in alpha% of batches
+		double dist_between_axles = 0.2;
+		double k_alpha = -2.96;
+		double rad_eps = 0.05;
+		double velocity_cost_weight = 0.5;
+		double terminal_lookahead_distance = 2.0;
+		double ma_en_close_to_goal_dist = 1.0;
+		size_t ma_en_close_to_goal_ts = 3;
+		double orca_time_boundary = 1.0;
+		double orca_responsibility_factor = 0.5;
+		bool ma_exclude_collision_traj = true;
+		double velocity_cost_close_to_goal_dist = 0.3;
+
+		int max_safe_distr_step = 0; // TODO: Add constraints for several steps
+		size_t max_neighbors_num = 100; // TODO: Sort neighbors by distance
+        double alpha = 0.3; // TODO: Sampling with initial mean value in alpha% of batches
 	};
 
 	struct AgentParams {
@@ -64,12 +77,12 @@ namespace mppica {
 		public:
 			Controller();
 
-			auto nextStep(const xt::xtensor<double, 1> &curr_state, const xt::xtensor<double, 2> &neighbors_states,
+			auto nextStep(const xt::xtensor<double, 1> &curr_state, const xt::xtensor<double, 2> &neighbors_states, const xt::xtensor<double, 1> &neighbors_sizes,
 						  const xt::xtensor<double, 1> &goal_state) -> std::tuple<xt::xtensor<double, 1>, xt::xtensor<double, 3>>;
 
-			void setAgentParams(AgentParams ag_params);
+			void setAgentParams(const AgentParams &ag_params);
 
-			void setAlgParams(MPPIParams alg_params);
+			void setAlgParams(const MPPIParams &alg_params);
 
 			void reset();
 
@@ -95,10 +108,15 @@ namespace mppica {
 			auto getCurrentControl() -> xt::xtensor<double, 1>;
 
 			void computeRunningCosts(size_t batch, size_t time_step, const xt::xtensor<double, 1> &initial_state,
-									 const xt::xtensor<double, 1> &goal_state);
+									 const xt::xtensor<double, 1> &goal_state, const xt::xtensor<double, 1> &neighbors_sizes);
 
 			void commonStateCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &initial_state,
 								 const xt::xtensor<double, 1> &goal_state);
+
+			void controlCost(size_t batch, size_t time_step);
+
+			void computeVelocityCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state);
+
 
 			void computeTerminalCosts(size_t batch, const xt::xtensor<double, 1> &goal_state);
 
@@ -113,10 +131,11 @@ namespace mppica {
 			void propagateNeighboursTrajectories(const xt::xtensor<double, 2> &neighbors_states);
 
 
-			void multiAgentCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state);
+			void multiAgentCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state, const xt::xtensor<double, 1> &neighbors_sizes);
 
 			void computeLinearConstraintsForState(const xt::xtensor<double, 1> &state,
-												  const xt::xtensor<double, 2> &neighbors_states);
+												  const xt::xtensor<double, 2> &neighbors_states,
+												  const xt::xtensor<double, 1> &neighbors_sizes);
 
 			void resampleInitialWithConstraints();
 
@@ -133,13 +152,7 @@ namespace mppica {
 			size_t step; // For debug purpuses
 			size_t controller_id; // For debug purpuses
 
-			bool ma_cost_en;
-			size_t max_neighbors_num;
-			size_t neighbors_num;
-			double ma_dist_weight;
-			double ma_collision_value;
-			double ma_dist_threshold;
-			int max_safe_distr_step;
+
 
 			size_t batch_size;
 			size_t time_steps;
@@ -152,6 +165,7 @@ namespace mppica {
 			double lambda;
 
 			bool safe_control_not_found;
+			size_t neighbors_num;
 
 			xt::xtensor<double, 3> sampled_controls;
 			xt::xtensor<double, 3> samples;
@@ -164,16 +178,40 @@ namespace mppica {
 			bool orca_complete = true;
 
 
+			bool ma_cost_en;
+			double ma_dist_weight;
+			double ma_collision_value;
+			double ma_dist_threshold;
+			bool ma_exclude_collision_traj = true;
+
+			double ma_en_close_to_goal_dist;
+			size_t ma_en_close_to_goal_ts;
+
+
+			size_t max_neighbors_num;
+			int max_safe_distr_step;
+			double k_alpha;
 
 			double common_run_cost_weight;
 			double common_terminal_cost_weight;
+			double velocity_cost_weight;
+
+			double velocity_cost_close_to_goal_dist;
+
+			double terminal_lookahead_distance;
 
 			double agent_size;
 			double vis_radius;
 			double rad_eps;
 
-			bool use_car_like_dyn;
+			double orca_time_boundary;
+			double orca_responsibility_factor;
 
+
+			std::vector<bool> excluded_traj;
+
+
+			bool use_car_like_dyn;
 			DiffDrive dyn_model; //TODO Generalize for other models
 			CarLike car_like_dyn;
 

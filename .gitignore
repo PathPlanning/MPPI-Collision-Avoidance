@@ -1,4 +1,9 @@
-/cmake-build-debug/
-/cmake-build-release/
-/.idea/
+cmake-build-debug/*
+cmake-build-release/*
+build/*
+.idea/*
+.vscode/*
+python_bind/.ropeproject/*
+example/__pycache__/*
 CMakeLists.txt.user
+example/.ipynb_checkpoints/example-checkpoint.ipynb

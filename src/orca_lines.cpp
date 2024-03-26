@@ -25,17 +25,20 @@ computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xten
 		neighbor_vel = xt::view(neighbors_states, neighbor, xt::range(2, 4));
 
 		rel_position = neighbor_pos - agent_pos; // (P_b - P_a)
+		curr_dist = xt::linalg::norm(rel_position, 2);
+		if (curr_dist > params.ignore_radius) {
+			// std::cout << curr_dist << " " << params.ignore_radius << "\n";
+			continue;
+		}
 
 		if (optimize_zero_velocities)
 			rel_velocity = xt::zeros<double>({2}); // (0, 0)
 		else
 			rel_velocity = (agent_vel - neighbor_vel); // (V_a - V_b)
 
-
-
 		radius_sum = params.agent_size + neighbors_sizes[neighbor]; // (R_a + R_b)
 		radius_sum_sq = radius_sum * radius_sum;
-		curr_dist = xt::linalg::norm(rel_position, 2);
+
 		curr_dist_sq = curr_dist * curr_dist;
 
 		if (curr_dist >= radius_sum) {

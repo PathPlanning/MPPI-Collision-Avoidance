@@ -28,6 +28,7 @@ struct ORCAParams {
 	double time_step;
 	double responsibility_factor = 0.5;
 	bool opt_zero_vel = true;
+	double ignore_radius = 3.0;
 };
 
 std::vector<ORCALine> computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xtensor<double, 2> neighbors_states,

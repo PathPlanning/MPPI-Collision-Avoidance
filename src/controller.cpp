@@ -13,15 +13,11 @@ namespace mppica {
 		setAgentParams(AgentParams());
 		dyn_model = DiffDrive();
 		car_like_dyn = CarLike();
-        rad_eps = 0.05; // TODO: Add to common parameter
-
-
 		reset();
 	}
 
-	auto Controller::nextStep(const xt::xtensor<double, 1> &curr_state, const xt::xtensor<double, 2> &neighbors_states,
+	auto Controller::nextStep(const xt::xtensor<double, 1> &curr_state, const xt::xtensor<double, 2> &neighbors_states, const xt::xtensor<double, 1> &neighbors_sizes,
 							  const xt::xtensor<double, 1> &goal_state) -> std::tuple<xt::xtensor<double, 1>, xt::xtensor<double, 3>> {
-
 		do {
 			resetTrajectories(curr_state);
 			if(ma_cost_en) {
@@ -31,7 +27,7 @@ namespace mppica {
 			generateSamples();
 
 			if (max_safe_distr_step >= 0) {
-				computeLinearConstraintsForState(curr_state, neighbors_states);
+				computeLinearConstraintsForState(curr_state, neighbors_states, neighbors_sizes);
 				resampleInitialWithConstraints();
 			}
 
@@ -40,29 +36,17 @@ namespace mppica {
 					updateControl(batch, t_step);
 					limitControl(batch, t_step);
 					updateTrajectory(batch, t_step);
-					computeRunningCosts(batch, t_step, curr_state, goal_state);
+					computeRunningCosts(batch, t_step, curr_state, goal_state, neighbors_sizes);
 				}
 				computeTerminalCosts(batch, goal_state);
 			}
 			updateControlSequence();
-
-
-
 			safe_control_not_found = checkCollisionFree();
 		} while (safe_control_not_found and not computationShouldStop());
-
 
 		if (safe_control_not_found) {
 			generateStopControl();
 			std::cerr << "No safe trajectory";
-		}
-
-
-		size_t strange_move_sum = 0;
-		for (size_t batch = 0; batch < batch_size; ++batch) {
-			if (traj_costs[batch] >= std::numeric_limits<double>::max() * 0.5) {
-				strange_move_sum += 1;
-			}
 		}
 
 		auto result = getCurrentControl();
@@ -82,22 +66,26 @@ namespace mppica {
 	void Controller::resetTrajectories(const xt::xtensor<double, 1> &initial_state) {
         generated_trajectories = xt::zeros<double>({batch_size, time_steps, DD_STATE_DIM}); // TODO: Generalize to common dynamics
 		traj_costs = xt::zeros<double>({batch_size});
+		excluded_traj = std::vector<bool>(batch_size, false);
 		xt::view(generated_trajectories, xt::all(), 0) = xt::view(initial_state, xt::range(0, 3));
 	}
 
 	void Controller::resetControlSeq() {
-        control_sequence = xt::empty<double>({time_steps - 1, DD_CONTROL_DIM}); // TODO: Generalize to common dynamics
+		// TODO: Generalize to common dynamics
+        control_sequence = xt::empty<double>({time_steps - 1, DD_CONTROL_DIM});
 		xt::view(control_sequence, xt::all(), xt::all()) = initial_values;
 	}
 
 	void Controller::resetSamples() {
-        samples = xt::zeros<double>({batch_size, time_steps - 1, DD_CONTROL_DIM}); // TODO: Generalize to common dynamics
-        sampled_controls = xt::zeros<double>({batch_size, time_steps - 1, DD_CONTROL_DIM}); // TODO: Generalize to common dynamics
+		// TODO: Generalize to common dynamics
+        samples = xt::zeros<double>({batch_size, time_steps - 1, DD_CONTROL_DIM});
+        sampled_controls = xt::zeros<double>({batch_size, time_steps - 1, DD_CONTROL_DIM});
 	}
 
 	void Controller::generateSamples() {
+		// TODO: Generalize to common dynamics
 		xt::xtensor<double, 2>::shape_type control_row_shape = {batch_size, time_steps - 1};
-        for (size_t i = 0; i < DD_CONTROL_DIM; ++i) { // TODO: Generalize to common dynamics
+        for (size_t i = 0; i < DD_CONTROL_DIM; ++i) {
 			xt::view(samples, xt::all(), xt::all(), i) = xt::random::randn<double>(control_row_shape, mean[i],
 																				   sample_std[{i, i}]);
 		}
@@ -109,7 +97,8 @@ namespace mppica {
 	}
 
 	void Controller::limitControl(size_t batch, size_t time_step) {
-        for (size_t i = 0; i < DD_CONTROL_DIM; ++i) { // TODO: Generalize to common dynamics
+		// TODO: Generalize to common dynamics
+        for (size_t i = 0; i < DD_CONTROL_DIM; ++i) {
 			sampled_controls[{batch, time_step, i}] = xt::clip(xt::view(sampled_controls, batch, time_step, i),
 															   control_limits[{i, static_cast<size_t>(0)}],
 															   control_limits[{i, static_cast<size_t>(1)}]);
@@ -144,70 +133,81 @@ namespace mppica {
 	}
 
 	void Controller::computeRunningCosts(size_t batch, size_t time_step, const xt::xtensor<double, 1> &initial_state,
-										 const xt::xtensor<double, 1> &goal_state) {
-		if (traj_costs[batch] > std::numeric_limits<double>::max() * 0.5) return;
+										 const xt::xtensor<double, 1> &goal_state, const xt::xtensor<double, 1> &neighbors_sizes) {
+		if (excluded_traj[batch]) return;
 
-        // TODO Exclude samples outside ORCA constraints (give them large cost)
+
 
 		commonStateCost(batch, time_step, initial_state, goal_state);
-		if (ma_cost_en) multiAgentCost(batch, time_step, goal_state);
-
-        // TODO: Move to separate function
-		traj_costs[batch] += lambda/2 * sampled_controls[{batch, time_step, static_cast<size_t>(0)}] * sampled_controls[{batch, time_step, static_cast<size_t>(0)}] / (sample_std[{0, 0}] * sample_std[{0, 0}]);
-		traj_costs[batch] += lambda/2 * sampled_controls[{batch, time_step, static_cast<size_t>(1)}] * sampled_controls[{batch, time_step, static_cast<size_t>(1)}] / (sample_std[{1, 1}] * sample_std[{1, 1}]);
-		traj_costs[batch] += lambda * sampled_controls[{batch, time_step, static_cast<size_t>(0)}] * samples[{batch, time_step, static_cast<size_t>(0)}] / (sample_std[{0, 0}] * sample_std[{0, 0}]);
-		traj_costs[batch] += lambda * sampled_controls[{batch, time_step, static_cast<size_t>(1)}] * samples[{batch, time_step, static_cast<size_t>(1)}] / (sample_std[{1, 1}] * sample_std[{1, 1}]);
-
-
-        // TODO: Move to separate function and set up enable/disable using common parameters
-		auto curr_pos = xt::view(initial_state, xt::range(0, 2));
-		auto goal_pos = xt::view(goal_state, xt::range(0, 2));
-		auto dist = xt::linalg::norm(curr_pos - goal_pos, 2);
-		if (dist > agent_size) {
-            double step_movement, dx, dy;
-			if (time_step == 0) {
-				return;
-			}
-			if (time_step == 1) {
-				dx = generated_trajectories[{batch, static_cast<size_t>(1), static_cast<size_t>(0)}] - initial_state[0];
-				dy = generated_trajectories[{batch, static_cast<size_t>(1), static_cast<size_t>(1)}] - initial_state[1];
-			}
-			else {
-				dx = generated_trajectories[{batch, time_step, static_cast<size_t>(0)}] -
-					 generated_trajectories[{batch, time_step - 1, static_cast<size_t>(0)}];
-				dy = generated_trajectories[{batch, time_step, static_cast<size_t>(1)}] -
-					 generated_trajectories[{batch, time_step - 1, static_cast<size_t>(1)}];
-			}
-			step_movement = sqrt(dx * dx + dy * dy);
-			if (abs(step_movement) < 0.001) {
-				step_movement = 0.001;
-			}
-            traj_costs[batch] += (1 / step_movement) * 0.5; // TODO: Add to common parameter
-		}
-
-
-
-        // TODO: Move to separate function and set up enable/disable using common parameter
-		xt::xtensor<double, 1> theta_line = xt::zeros<double>({3});
-		if (time_step == 1 and not orca_complete) {
-
-			auto curr_x = generated_trajectories[{batch, time_step, static_cast<size_t>(0)}];
-			auto curr_y = generated_trajectories[{batch, time_step, static_cast<size_t>(1)}];
-			auto next_x = generated_trajectories[{batch, time_step+1, static_cast<size_t>(0)}];
-			auto next_y = generated_trajectories[{batch, time_step+1, static_cast<size_t>(1)}];
-
-			xt::xtensor<double, 1> curr_v = xt::xtensor<double, 1>({next_x - curr_x, next_y - curr_y}) / dt;
-
-			size_t line_num = linear_constraints.shape(0);
-			for (size_t line_id = 0; line_id < line_num; ++line_id) {
-				xt::xtensor<double, 1> line = xt::view(linear_constraints, line_id, xt::all());
-				if (line[0] * curr_v[0] + line[1] * curr_v[1] + line[2] > 0) {
-					traj_costs[batch] = std::numeric_limits<double>::max() * 0.8;
-					break;
-				}
-			}
-		}
+		if (ma_cost_en) multiAgentCost(batch, time_step, goal_state, neighbors_sizes);
+		controlCost(batch, time_step);
+		computeVelocityCost(batch, time_step, goal_state);
 	}
+
+	void Controller::computeVelocityCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state) {
+
+		auto goal_pos = xt::view(goal_state, xt::range(0, 2));
+		auto current_pos = xt::view(generated_trajectories, batch, static_cast<size_t>(0), xt::range(0, 2));
+		auto dist = xt::linalg::norm(current_pos - goal_pos, 2);
+		if (dist < velocity_cost_close_to_goal_dist) {
+			return;
+		}
+		if (time_step == 0) {
+			return;
+		}
+
+		auto dx = generated_trajectories[{batch, time_step, static_cast<size_t>(0)}] -
+			 generated_trajectories[{batch, time_step - 1, static_cast<size_t>(0)}];
+		auto dy = generated_trajectories[{batch, time_step, static_cast<size_t>(1)}] -
+			 generated_trajectories[{batch, time_step - 1, static_cast<size_t>(1)}];
+
+		auto step_movement = sqrt(dx * dx + dy * dy);
+		if (abs(step_movement) < 0.001) {
+			step_movement = 0.001;
+		}
+		traj_costs[batch] += (1 / step_movement) * velocity_cost_weight;
+
+
+	}
+
+
+	void Controller::controlCost(size_t batch, size_t time_step) {
+		traj_costs[batch] += lambda/2 * sampled_controls[{batch, time_step, static_cast<size_t>(0)}] *
+			sampled_controls[{batch, time_step, static_cast<size_t>(0)}] / (sample_std[{0, 0}] * sample_std[{0, 0}]);
+		traj_costs[batch] += lambda/2 * sampled_controls[{batch, time_step, static_cast<size_t>(1)}] *
+			sampled_controls[{batch, time_step, static_cast<size_t>(1)}] / (sample_std[{1, 1}] * sample_std[{1, 1}]);
+		traj_costs[batch] += lambda * sampled_controls[{batch, time_step, static_cast<size_t>(0)}] *
+			samples[{batch, time_step, static_cast<size_t>(0)}] / (sample_std[{0, 0}] * sample_std[{0, 0}]);
+		traj_costs[batch] += lambda * sampled_controls[{batch, time_step, static_cast<size_t>(1)}] *
+			samples[{batch, time_step, static_cast<size_t>(1)}] / (sample_std[{1, 1}] * sample_std[{1, 1}]);
+	}
+
+
+	// void Controller::excludeOutsideORCAConstraints(size_t batch) {
+	// 	// If in a current state the agent cannot find a solution that satisfies the constraints (and we assume that the agent stops),
+	// 	// then we check that the next state in the trajectory satisfies the constraints.
+	// 	// If this does not happen, then we exclude the trajectories from the sample.
+	//
+	// 	if (not orca_complete) {
+	// 		auto curr_x = generated_trajectories[{batch, static_cast<size_t>(1), static_cast<size_t>(0)}];
+	// 		auto curr_y = generated_trajectories[{batch, static_cast<size_t>(1), static_cast<size_t>(1)}];
+	// 		auto next_x = generated_trajectories[{batch, static_cast<size_t>(2), static_cast<size_t>(0)}];
+	// 		auto next_y = generated_trajectories[{batch, static_cast<size_t>(2), static_cast<size_t>(1)}];
+	//
+	// 		xt::xtensor<double, 1> curr_v = xt::xtensor<double, 1>({next_x - curr_x, next_y - curr_y}) / dt;
+	//
+	// 		size_t line_num = linear_constraints.shape(0);
+	// 		for (size_t line_id = 0; line_id < line_num; ++line_id) {
+	// 			xt::xtensor<double, 1> line = xt::view(linear_constraints, line_id, xt::all());
+	// 			if (line[0] * curr_v[0] + line[1] * curr_v[1] + line[2] > 0) {
+	// 				excluded_traj[batch] = true;
+	// 				break;
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+
 
 	void Controller::commonStateCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &initial_state,
 									 const xt::xtensor<double, 1> &goal_state) {
@@ -220,15 +220,11 @@ namespace mppica {
 	}
 
 	void Controller::computeTerminalCosts(size_t batch, const xt::xtensor<double, 1> &goal_state) {
-		if (traj_costs[batch] > std::numeric_limits<double>::max() * 0.5) return;
-		if (not orca_complete) return;
-
+		if (excluded_traj[batch] or not orca_complete) return;
 		commonTerminalCost(batch, goal_state);
 	}
 
 	void Controller::commonTerminalCost(size_t batch, const xt::xtensor<double, 1> &goal_state) {
-
-        double lookahead_distance = 2.0; // TODO: Add to common parameter
 
 		auto last_pos = xt::view(generated_trajectories, batch, -1, xt::range(0, 2));
 		auto goal_pos = xt::view(goal_state, xt::range(0, 2));
@@ -236,8 +232,8 @@ namespace mppica {
 		double goal_vector_len = xt::linalg::norm(goal_vector, 2);
 
 		double dist = 0.0;
-		if (goal_vector_len > lookahead_distance) {
-			auto curr_goal_pos = xt::view(generated_trajectories, batch, 0, xt::range(0, 2)) + lookahead_distance *
+		if (goal_vector_len > terminal_lookahead_distance) {
+			auto curr_goal_pos = xt::view(generated_trajectories, batch, 0, xt::range(0, 2)) + terminal_lookahead_distance *
 					(goal_vector / goal_vector_len);
 
 			dist = xt::linalg::norm(last_pos - curr_goal_pos, 2);
@@ -272,11 +268,12 @@ namespace mppica {
 		auto weights = xt::eval(xt::exp(-1. / lambda * (traj_costs - beta)) / eta);
 
 
-        for (size_t batch = 0; batch < batch_size; ++batch) { // TODO: Add enabling/disabling as common parameter
-			if (traj_costs[batch] >= ma_collision_value) {
+		for (size_t batch = 0; batch < batch_size; ++batch) {
+			if (excluded_traj[batch]) {
 				weights[batch] = 0.0;
 			}
 		}
+
 
 		control_sequence = xt::sum(xt::view(weights, xt::all(), xt::newaxis(), xt::newaxis()) * sampled_controls, {0},
 								   xt::evaluation_strategy::immediate);
@@ -302,7 +299,7 @@ namespace mppica {
 		return false;
 	}
 
-	void Controller::setAlgParams(MPPIParams alg_params) {
+	void Controller::setAlgParams(const MPPIParams &alg_params) {
 		time_steps = alg_params.time_steps;
 		batch_size = alg_params.batch_size;
 		mean = alg_params.mean;
@@ -310,22 +307,29 @@ namespace mppica {
 		initial_values = alg_params.initial_values;
 		dt = alg_params.dt;
 		lambda = alg_params.lambda;
-		common_run_cost_weight = alg_params.common_run_cost_weight;
-		common_terminal_cost_weight = alg_params.common_terminal_cost_weight;
+		common_run_cost_weight = alg_params.run_cost_weight;
+		common_terminal_cost_weight = alg_params.terminal_cost_weight;
 		ma_cost_en = alg_params.ma_cost_en;
 		max_neighbors_num = alg_params.max_neighbors_num;
 		ma_dist_weight = alg_params.ma_dist_weight;
 		ma_collision_value = alg_params.ma_collision_value;
 		ma_dist_threshold = alg_params.ma_dist_threshold;
-		max_safe_distr_step = alg_params.max_safe_distr_step;
-
-        use_car_like_dyn = alg_params.car_like_dyn;
-        car_like_dyn.dist_between_axles = 0.2; // TODO: Add to common parameter
-
+		k_alpha = alg_params.k_alpha;
+		rad_eps = alg_params.rad_eps;
+		use_car_like_dyn = alg_params.car_like_dyn;
+		car_like_dyn.dist_between_axles = alg_params.dist_between_axles;
+		velocity_cost_weight = alg_params.velocity_cost_weight;
+		terminal_lookahead_distance = alg_params.terminal_lookahead_distance;
+		ma_en_close_to_goal_dist = alg_params.ma_en_close_to_goal_dist;
+		ma_en_close_to_goal_ts = alg_params.ma_en_close_to_goal_ts;
+		orca_time_boundary = alg_params.orca_time_boundary;
+		orca_responsibility_factor = alg_params.orca_responsibility_factor;
+		ma_exclude_collision_traj = alg_params.ma_exclude_collision_traj;
+		velocity_cost_close_to_goal_dist = alg_params.velocity_cost_close_to_goal_dist;
 		reset();
 	}
 
-	void Controller::setAgentParams(AgentParams ag_params) {
+	void Controller::setAgentParams(const AgentParams &ag_params) {
         // TODO: Generalize to common dynamics
         agent_size = ag_params.size;
 		vis_radius = ag_params.vis_radius;
@@ -354,14 +358,14 @@ namespace mppica {
 		neighbors_traj = xt::zeros<double>({max_neighbors_num, time_steps, POSITION_DIM});
 	}
 
-	void Controller::multiAgentCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state) {
+	void Controller::multiAgentCost(size_t batch, size_t time_step, const xt::xtensor<double, 1> &goal_state, const xt::xtensor<double, 1> &neighbors_sizes) {
 		if (neighbors_num == 0)
 			return;
 
 		auto curr_pos = xt::view(generated_trajectories, batch, 0, xt::range(0, POSITION_DIM));
 		auto goal_pos = xt::view(goal_state, xt::range(0, 2));
 		auto goal_dist = xt::linalg::norm(curr_pos - goal_pos, 2);
-        if (goal_dist < 1.0 and time_step > 3) // TODO: Add to common parameter
+        if (goal_dist < ma_en_close_to_goal_dist and time_step > ma_en_close_to_goal_ts)
 			return;
 
 		double min_dist = std::numeric_limits<double>::max();
@@ -373,36 +377,42 @@ namespace mppica {
 					, 2);
 			if (dist < min_dist)
 				min_dist = dist;
-
-            if (dist < (2 * (agent_size + rad_eps))) { // TODO: Add to common parameter, consider different sizes
+			auto neighbor_size = neighbors_sizes[agent];
+            if (dist < ( (neighbor_size + agent_size) + 2 * rad_eps)) {
+            	if (ma_exclude_collision_traj)
+            		excluded_traj[batch] = true;
 				traj_costs[batch] = ma_collision_value;
 				return;
 			}
 		}
 		if (min_dist > ma_dist_threshold)
 			return;
-        traj_costs[batch] += ma_dist_weight * (3 * (agent_size + rad_eps) / min_dist); // TODO: Add to common parameter, consider different sizes
+        traj_costs[batch] += ma_dist_weight * (1 / min_dist);
 	}
 
 	void Controller::computeLinearConstraintsForState(const xt::xtensor<double, 1> &state,
-													  const xt::xtensor<double, 2> &neighbors_states) {
+													  const xt::xtensor<double, 2> &neighbors_states,
+													  const xt::xtensor<double, 1> &neighbors_sizes) {
 
 		ORCAParams orca_params;
-        orca_params.agents_max_num = 60; // TODO: Add to common parameter
-        orca_params.agent_size =  (agent_size + rad_eps); // TODO: Add to common parameter
-        orca_params.time_boundary = 1.0; // TODO: Add to common parameter
-        orca_params.time_step = dt; // TODO: Add to common parameter
-        orca_params.responsibility_factor = 0.5 ; // TODO: Add to common parameter
+        orca_params.agents_max_num = max_neighbors_num;
+
+
+        orca_params.agent_size =  (agent_size + rad_eps);
+        orca_params.time_boundary = orca_time_boundary;
+        orca_params.time_step = dt;
+        orca_params.responsibility_factor = orca_responsibility_factor;
 		orca_params.opt_zero_vel = false;
+
 		size_t neighbors_num = (orca_params.agents_max_num < neighbors_states.shape(0)) ? orca_params.agents_max_num
 																				   : neighbors_states.shape(0);
 
-        xt::xtensor<double, 1> neighbors_sizes = xt::ones<double>({neighbors_num}) * orca_params.agent_size; // TODO: Consider different sizes
+
 		orca_lines = computeORCALines(orca_params, state, neighbors_states, neighbors_sizes);
 
-		linear_constraints = xt::zeros<double>({neighbors_num, static_cast<size_t>(3)});
+		linear_constraints = xt::zeros<double>({orca_lines.size(), static_cast<size_t>(3)});
 
-		for (size_t i = 0; i < neighbors_num; ++i) {
+		for (size_t i = 0; i < orca_lines.size(); ++i) {
 			auto orca_line = orca_lines[i];
 			double a = orca_line.dir[1];
 			double b = -orca_line.dir[0];
@@ -449,20 +459,20 @@ namespace mppica {
 		xt::xtensor<double, 1> coefs;
 		xt::xtensor<double, 1> bounds;
 		std::tie(coefs, bounds) = translateConstraintsToControlBounds(state);
-		double k_alpha = -2.96;
+
 		double mu0 = mean[0] + control[0];
 		double sigma0 = sample_std[{0, 0}];
 		double v_min = control_limits[{0, 0}];
 		double v_max = control_limits[{0, 1}];
 
-		std::unique_ptr<MPSolver> solver(MPSolver::CreateSolver("GLOP"));
-		if (!solver) {
-			LOG(WARNING) << "SCIP solver unavailable.";
+		std::unique_ptr<MPSolver> solver(MPSolver::CreateSolver("SCIP"));
+
+		if (not solver) {
+			std::cout << "SCIP solver unavailable.";
 			exit(-1);
 		}
 
 		const double infinity = solver->infinity();
-
 
 		auto variables = std::vector<MPVariable*>(4);
 		variables[0] = solver->MakeNumVar(-infinity, infinity, "x0");
@@ -470,46 +480,38 @@ namespace mppica {
 		variables[2] = solver->MakeNumVar(-infinity, infinity, "x2");
 		variables[3] = solver->MakeNumVar(-infinity, infinity, "x3");
 
-
 		auto n_constr = coefs.shape(0);
 		for (size_t i = 0; i < n_constr; ++i) {
 			MPConstraint* const c0 = solver->MakeRowConstraint(-infinity, bounds[i]);
 			c0->SetCoefficient(variables[0], coefs[i]);
 			c0->SetCoefficient(variables[1], coefs[i] * -k_alpha);
 		}
-
 		MPConstraint* const c1 = solver->MakeRowConstraint(-infinity, v_max);
 		c1->SetCoefficient(variables[0], 1.0);
 		c1->SetCoefficient(variables[1], -k_alpha);
-
 		MPConstraint* const c2 = solver->MakeRowConstraint(-infinity, -v_min);
 		c2->SetCoefficient(variables[0], -1.0);
 		c2->SetCoefficient(variables[1], -k_alpha);
-
 		MPConstraint* const c3 = solver->MakeRowConstraint(-infinity, mu0);
 		c3->SetCoefficient(variables[0], 1.0);
 		c3->SetCoefficient(variables[1], 0.0);
 		c3->SetCoefficient(variables[2], -1.0);
 		c3->SetCoefficient(variables[3], 0.0);
-
 		MPConstraint* const c4 = solver->MakeRowConstraint(-infinity, sigma0);
 		c4->SetCoefficient(variables[0], 0.0);
 		c4->SetCoefficient(variables[1], 1.0);
 		c4->SetCoefficient(variables[2], 0.0);
 		c4->SetCoefficient(variables[3], -1.0);
-
 		MPConstraint* const c5 = solver->MakeRowConstraint(-infinity, -mu0);
 		c5->SetCoefficient(variables[0], -1.0);
 		c5->SetCoefficient(variables[1], 0.0);
 		c5->SetCoefficient(variables[2], -1.0);
 		c5->SetCoefficient(variables[3], 0.0);
-
 		MPConstraint* const c6 = solver->MakeRowConstraint(-infinity, -sigma0);
 		c6->SetCoefficient(variables[0], 0.0);
 		c6->SetCoefficient(variables[1], -1.0);
 		c6->SetCoefficient(variables[2], 0.0);
 		c6->SetCoefficient(variables[3], -1.0);
-
 		MPObjective* const objective = solver->MutableObjective();
 		objective->SetCoefficient(variables[0], 0.0);
 		objective->SetCoefficient(variables[1], 0.0);

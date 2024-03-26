@@ -71,6 +71,9 @@ pybind11_add_module(mppi_ca_cpp python_bind/converters.hpp python_bind/converter
 target_link_libraries(mppi_ca_cpp PRIVATE xtensor-python Python::NumPy)
 target_link_libraries(mppi_ca_cpp PRIVATE controller_library ortools::ortools)
 
+set_target_properties(mppi_ca_cpp PROPERTIES PREFIX "")
+set_target_properties(mppi_ca_cpp PROPERTIES OUTPUT_NAME "mppi_ca_cpp")
+set_target_properties(mppi_ca_cpp PROPERTIES SUFFIX ".so")
 
 add_custom_target(mppi_all)
 add_dependencies(mppi_all

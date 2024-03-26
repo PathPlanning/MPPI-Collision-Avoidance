@@ -7,7 +7,7 @@ from scipy.spatial import KDTree
 from params_names import *
 from os.path import dirname
 
-sys.path.append(dirname("../build/release/mppi_ca_cpp.cpython-311-x86_64-linux-gnu.so"))
+sys.path.append(dirname("../build/release/mppi_ca_cpp.so"))
 import mppi_ca_cpp
 
 

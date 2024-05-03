@@ -1,6 +1,5 @@
 #include "orca_lines.hpp"
 
-// TODO: Translate comments from russian to english
 std::vector<ORCALine>
 computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xtensor<double, 2> neighbors_states,
 				 xt::xtensor<double, 1> neighbors_sizes) {
@@ -27,7 +26,6 @@ computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xten
 		rel_position = neighbor_pos - agent_pos; // (P_b - P_a)
 		curr_dist = xt::linalg::norm(rel_position, 2);
 		if (curr_dist > params.ignore_radius) {
-			// std::cout << curr_dist << " " << params.ignore_radius << "\n";
 			continue;
 		}
 
@@ -42,7 +40,6 @@ computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xten
 		curr_dist_sq = curr_dist * curr_dist;
 
 		if (curr_dist >= radius_sum) {
-			// w -- вектор на плоскости скоростей от центра малой окружности (основания VO) до скорости другого агента относительно этого
 			w = rel_velocity - (rel_position * inv_time_boundary);
 
 			w_length = xt::linalg::norm(w, 2);
@@ -50,8 +47,6 @@ computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xten
 			double sq_w_length = w_length * w_length;
 			double w_proj = xt::linalg::dot(w, rel_position)[0];
 
-			// если эти условия выполняются, то вектор w отложенный из центра окружности-основания VO будет своим концом ближе к
-			// этой самой окружности, а значит и ближайшая точка на границе VO -- это какая-то точка на этой окружнрости
 
 			if (w_proj < 0.0f and (w_proj * w_proj) > sq_w_length * radius_sum_sq) {
 				nw = w / w_length;
@@ -60,17 +55,13 @@ computeORCALines(ORCAParams params, xt::xtensor<double, 1> agent_state, xt::xten
 				u = nw * ((radius_sum * inv_time_boundary) - w_length);
 			}
 			else {
-				//иначе проекция на стороны VO
-				//длина проекции вектора относительных положений на сторону VO
 				double leg = std::sqrt(curr_dist_sq - radius_sum_sq);
 				if (determinant2D(rel_position, w) > 0.0f) {
-					//если точка ближе к левой стороне VO
 					curr_line.dir[0] = rel_position[0] * leg - rel_position[1] * radius_sum;
 					curr_line.dir[1] = rel_position[0] * radius_sum + rel_position[1] * leg;
 					curr_line.dir /= curr_dist_sq;
 				}
 				else {
-					//если точка ближе к правой стороне VO
 					curr_line.dir[0] = rel_position[0] * leg + rel_position[1] * radius_sum;
 					curr_line.dir[1] = -rel_position[0] * radius_sum + rel_position[1] * leg;
 					curr_line.dir *= -1;
@@ -133,7 +124,6 @@ bool linearProgram1(const std::vector<ORCALine> &lines, unsigned long curr, floa
 	float discriminant = dot_product * dot_product + radius * radius - pow(xt::linalg::norm(lines[curr].point_lies_on), 2);
 
 	if (discriminant < 0.0f) {
-		// Максимальная скорость не позволяет удовлетворить это условие
 		return false;
 	}
 
@@ -147,7 +137,6 @@ bool linearProgram1(const std::vector<ORCALine> &lines, unsigned long curr, floa
 		const double numerator = determinant2D(lines[i].dir, lines[curr].point_lies_on - lines[i].point_lies_on);
 
 		if (std::fabs(denominator) <= 0.00001) {
-			// Текущая и сравниваемая линии параллельны
 			if (numerator < 0.0f) {
 				return false;
 			}
@@ -159,11 +148,9 @@ bool linearProgram1(const std::vector<ORCALine> &lines, unsigned long curr, floa
 		const double t = numerator / denominator;
 
 		if (denominator >= 0.0f) {
-			/* Line i bounds line lineNo on the right. */
 			t_right = std::min(t_right, t);
 		}
 		else {
-			/* Line i bounds line lineNo on the left. */
 			t_left = std::max(t_left, t);
 		}
 
@@ -173,18 +160,14 @@ bool linearProgram1(const std::vector<ORCALine> &lines, unsigned long curr, floa
 	}
 
 	if (direction_opt) {
-		/* Optimize direction. */
 		if (xt::linalg::dot(opt_velocity, lines[curr].dir)[0] > 0.0f) {
-			/* Take right extreme. */
 			result = lines[curr].point_lies_on + lines[curr].dir * t_right;
 		}
 		else {
-			/* Take left extreme. */
 			result = lines[curr].point_lies_on + lines[curr].dir * t_left;
 		}
 	}
 	else {
-		/* Optimize closest point. */
 		const double t = xt::linalg::dot(lines[curr].dir, opt_velocity - lines[curr].point_lies_on)[0];
 
 		if (t < t_left) {

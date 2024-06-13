@@ -1,19 +1,19 @@
 [submodule "external/xtensor"]
-	path = external/xtensor
+	path = mppi-ca/libs/xtensor
 	url = git@github.com:xtensor-stack/xtensor.git
 [submodule "external/xtensor-blas"]
-	path = external/xtensor-blas
+	path = mppi-ca/libs/xtensor-blas
 	url = git@github.com:xtensor-stack/xtensor-blas.git
 [submodule "external/xtl"]
-	path = external/xtl
+	path = mppi-ca/libs/xtl
 	url = git@github.com:xtensor-stack/xtl.git
 [submodule "external/xsimd"]
-	path = external/xsimd
+	path = mppi-ca/libs/xsimd
 	url = git@github.com:xtensor-stack/xsimd.git
 [submodule "external/pybind11"]
-	path = external/pybind11
+	path = mppi-ca/libs/pybind11
 	url = git@github.com:pybind/pybind11.git
 	branch = stable
 [submodule "external/xtensor-python"]
-	path = external/xtensor-python
+	path = mppi-ca/libs/xtensor-python
 	url = git@github.com:xtensor-stack/xtensor-python.git

@@ -34,13 +34,13 @@ message(STATUS "BLAS LIBRARIES: " ${BLAS_LIBRARIES})
 
 set(XTENSOR_USE_XSIMD ON)
 
-add_subdirectory(external/xsimd)
-add_subdirectory(external/xtl)
-add_subdirectory(external/xtensor)
-add_subdirectory(external/xtensor-blas)
-add_subdirectory(external/xtensor-python)
+add_subdirectory(libs/xsimd)
+add_subdirectory(libs/xtl)
+add_subdirectory(libs/xtensor)
+add_subdirectory(libs/xtensor-blas)
+add_subdirectory(libs/xtensor-python)
 
-add_subdirectory(external/pybind11)
+add_subdirectory(libs/pybind11)
 
 
 add_library(controller_library SHARED
@@ -57,10 +57,9 @@ target_include_directories(controller_library
 
 target_compile_definitions(controller_library PUBLIC -DUSE_CBLAS)
 
-# -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING -D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS -DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP -DUSE_SCIP 
+target_link_options(controller_library PRIVATE -static-libgcc -static-libstdc++)
 
 target_link_libraries(controller_library ${LAPACK_LIBRARIES})
-
 target_link_libraries(controller_library xtensor)
 target_link_libraries(controller_library xtensor-blas)
 target_link_libraries(controller_library xsimd)
@@ -68,6 +67,9 @@ target_link_libraries(controller_library ortools::ortools)
 
 
 pybind11_add_module(mppi_ca_cpp python_bind/converters.hpp python_bind/converters.cpp python_bind/mppi_ca_cpp.cpp NO_EXTRAS)
+
+target_link_options(mppi_ca_cpp PRIVATE -static-libgcc -static-libstdc++)
+
 target_link_libraries(mppi_ca_cpp PRIVATE xtensor-python Python::NumPy)
 target_link_libraries(mppi_ca_cpp PRIVATE controller_library ortools::ortools)
 

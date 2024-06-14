@@ -1,3 +1,3 @@
-Model Predictive Path Integral for Multi-Agent Collision Avoidance -- Experimental Evaluation Data
+# Model Predictive Path Integral for Multi-Agent Collision Avoidance: Experimental Evaluation Data
 
 Coming soon...

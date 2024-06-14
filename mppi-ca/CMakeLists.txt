@@ -34,13 +34,14 @@ message(STATUS "BLAS LIBRARIES: " ${BLAS_LIBRARIES})
 
 set(XTENSOR_USE_XSIMD ON)
 
+add_subdirectory(libs/pybind11)
 add_subdirectory(libs/xsimd)
 add_subdirectory(libs/xtl)
 add_subdirectory(libs/xtensor)
 add_subdirectory(libs/xtensor-blas)
 add_subdirectory(libs/xtensor-python)
 
-add_subdirectory(libs/pybind11)
+
 
 
 add_library(controller_library SHARED

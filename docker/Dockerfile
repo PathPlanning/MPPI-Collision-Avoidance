@@ -46,7 +46,8 @@ RUN pip3 install --upgrade pip && \
         opencv-python \
         opencv-contrib-python \
         jinja2 \
-        filterpy
+        filterpy \
+        jupyter
 
 
 # Utils 
@@ -58,7 +59,8 @@ RUN apt-get update && \
         neovim \
         nano \
         htop \
-        iputils-ping && \
+        iputils-ping \
+        libopenblas-dev && \
         rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && \
@@ -67,12 +69,6 @@ RUN apt-get update && \
 
 # Scripts
 USER $NEWUSER
-
-# RUN -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.0/zsh-in-docker.sh)" -- \
-# 	-p git \
-# 	-p https://github.com/zsh-users/zsh-autosuggestions \
-# 	-p https://github.com/zsh-users/zsh-completions \
-# 	-p https://github.com/zsh-users/zsh-syntax-highlighting 
 
 
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.0/zsh-in-docker.sh)" -- \

@@ -5,11 +5,13 @@
   <img src="img/mppi_demo.gif" width="500"/>
 </p>
 
+> [!Important]  
+> **This is supplementary code for paper:**
+> 
+> Dergachev S, Yakovlev K. 2024. Model predictive path integral for decentralized multi-agent collision avoidance. PeerJ Computer Science 10:e2220 https://doi.org/10.7717/peerj-cs.2220 [[URL](https://peerj.com/articles/cs-2220/)], [[PDF](https://peerj.com/articles/cs-2220.pdf)]
+
 
 Implementation of distributed multi-agent collision avoidance algorithm based on the seminal sampling-based model predictive control algorithm, i.e., _MPPI_ [[1](https://homes.cs.washington.edu/~bboots/files/InformationTheoreticMPC.pdf)], that originally solves a single-agent problem. We enhance it by introducing safe distributions for the multi-agent setting that are derived from the _Optimal Reciprocal Collision Avoidance (ORCA)_ linear constraints [[2](https://gamma.cs.unc.edu/ORCA/publications/ORCA.pdf)], an established approach from the multi-agent navigation domain. 
-
-
-This is supplementary code for paper "Model Predictive Path Integral for Decentralized Multi-Agent Collision Avoidance" which is under consideration in the PeerJ Computer Science journal. 
 
 
 The pipeline of the proposed algorithm is presented on picture below. The red elements on scheme demonstrate the components that were added to MPPI procedure to adapt in for decentralized multi-agent scenario. Our approach introduсes a method for taking into account linear constraints in the sampling process. The corresponding component is marked with an asterisk on the scheme.

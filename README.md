@@ -7,8 +7,10 @@
 
 > [!Important]  
 > **This is supplementary code for paper:**
-> 
-> Dergachev S, Yakovlev K. 2024. Model predictive path integral for decentralized multi-agent collision avoidance. PeerJ Computer Science 10:e2220 https://doi.org/10.7717/peerj-cs.2220 [[URL](https://peerj.com/articles/cs-2220/)], [[PDF](https://peerj.com/articles/cs-2220.pdf)]
+>
+> S. Dergachev and K. Yakovlev, “Model predictive path integral for decentralized multi-agent collision avoidance,” PeerJ Computer Science, vol. 10, p. e2220, 2024, doi: 10.7717/peerj-cs.2220. [[URL](https://peerj.com/articles/cs-2220/)], [[PDF](https://peerj.com/articles/cs-2220.pdf)]
+>
+> **[Coming soon]** S. Dergachev and K. Yakovlev, “Decentralized Uncertainty-Aware Multi-Agent Collision Avoidance with Model Predictive Path Integral,” in Proceedings of the 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS2025), 2025. [[arXiv](https://arxiv.org/abs/2507.20293)]
 
 
 Implementation of distributed multi-agent collision avoidance algorithm based on the seminal sampling-based model predictive control algorithm, i.e., _MPPI_ [[1](https://homes.cs.washington.edu/~bboots/files/InformationTheoreticMPC.pdf)], that originally solves a single-agent problem. We enhance it by introducing safe distributions for the multi-agent setting that are derived from the _Optimal Reciprocal Collision Avoidance (ORCA)_ linear constraints [[2](https://gamma.cs.unc.edu/ORCA/publications/ORCA.pdf)], an established approach from the multi-agent navigation domain. 
